@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 
 
 class TokenTypes(models.TextChoices):
@@ -162,3 +163,54 @@ class TopToken(CoinToken):
     class Meta:
         verbose_name = "Top Token"
         verbose_name_plural = "Top Tokens"
+
+
+class TokenUpdateRequest(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
+        verbose_name="User",
+    )
+
+    # Only one of these should be set
+    top_token = models.ForeignKey(
+        TopToken,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        verbose_name="Top Token",
+    )
+    gaming_token = models.ForeignKey(
+        GamingToken,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        verbose_name="Gamin Token",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["top_token"],
+                condition=models.Q(top_token__isnull=False),
+                name="unique_top_token_request",
+            ),
+            models.UniqueConstraint(
+                fields=["gaming_token"],
+                condition=models.Q(gaming_token__isnull=False),
+                name="unique_gaming_token_request",
+            ),
+            models.CheckConstraint(
+                check=models.Q(top_token__isnull=False, gaming_token__isnull=True)
+                | models.Q(top_token__isnull=True, gaming_token__isnull=False),
+                name="exactly_one_token_set",
+            ),
+        ]
+
+    def __str__(self):
+        token = self.top_token or self.gaming_token
+        return f"UpdateRequest({token}) by {self.user}"
