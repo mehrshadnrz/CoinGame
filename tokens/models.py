@@ -136,7 +136,7 @@ class TopToken(CoinToken):
         verbose_name="Binance Symbol",
     )
     token_type = models.CharField(
-        max_length=16,
+        max_length=32,
         choices=TokenTypes,
         null=False,
         blank=False,
