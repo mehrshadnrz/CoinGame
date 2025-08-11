@@ -1,10 +1,17 @@
 from django.contrib.auth import get_user_model
-from django.db import utils
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from tokens.models import GamingToken, TokenTypes, TokenUpdateRequest, TopToken
+from tokens.models import (
+    GamingToken,
+    ListingStatus,
+    TokenKind,
+    TokenListingRequest,
+    TopTokenTypes,
+    TokenUpdateRequest,
+    TopToken,
+)
 
 User = get_user_model()
 
@@ -68,7 +75,7 @@ class TopTokenAPITest(APITestCase):
             "security_badge": True,
             "trading_view_symbol": "TPCUSD",
             "binance_symbol": "TOPCOINUSDT",
-            "token_type": TokenTypes.TOP_TOKEN,
+            "token_type": TopTokenTypes.TOP_TOKEN,
             "coingecko_id": "topcoin",
         }
         self.url = "/api/top-tokens/"
@@ -215,25 +222,25 @@ class TokenUpdateRequestTests(APITestCase):
         """Prevent duplicate requests for same token"""
         self.client.force_authenticate(user=self.user1)
         data1 = {"top_token": self.top_token1.id}
-        
+
         response1 = self.client.post(self.list_url, data1)
         self.assertEqual(response1.status_code, status.HTTP_201_CREATED)
-        
+
         response2 = self.client.post(self.list_url, data1)
         self.assertEqual(response2.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("top_token", response2.data)
         self.assertEqual(
             response2.data["top_token"][0],
-            "An update request for this token already exists."
+            "An update request for this token already exists.",
         )
-        
+
         self.client.force_authenticate(user=self.user2)
         response3 = self.client.post(self.list_url, data1)
         self.assertEqual(response3.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("top_token", response3.data)
         self.assertEqual(
             response3.data["top_token"][0],
-            "An update request for this token already exists."
+            "An update request for this token already exists.",
         )
 
     def test_user_sees_only_own_requests(self):
@@ -348,3 +355,335 @@ class TokenUpdateRequestTests(APITestCase):
         self.client.post(self._get_accept_url(request.id))
         self.top_token1.refresh_from_db()
         self.assertTrue(self.top_token1.security_badge)
+
+
+class TokenListingRequestTests(APITestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(
+            username="user1", password="password", is_staff=False
+        )
+        self.user2 = User.objects.create_user(
+            username="user2", password="password", is_staff=False
+        )
+        self.admin = User.objects.create_user(
+            username="admin", password="adminpass", is_staff=True
+        )
+
+        # some existing production tokens to test duplicate prevention
+        TopToken.objects.create(
+            name="ExistingTop",
+            symbol="EXTOP",
+            trading_view_symbol="EXTOPUSD",
+            binance_symbol="EXTOPUSDT",
+            coingecko_id="existingtop",
+            token_type=TokenKind.TOP_TOKEN,
+            security_badge=False,
+        )
+
+        GamingToken.objects.create(
+            name="ExistingGame",
+            symbol="EXG",
+            trading_view_symbol="EXGUSD",
+            network="Ethereum",
+            pool_address="0xabc",
+            security_badge=False,
+        )
+
+        self.list_url = reverse("token-listing-request-list")
+
+    def _detail_url(self, pk):
+        return reverse("token-listing-request-detail", args=[pk])
+
+    def _approve_url(self, pk):
+        return reverse("token-listing-request-approve", args=[pk])
+
+    def _reject_url(self, pk):
+        return reverse("token-listing-request-reject", args=[pk])
+
+    def test_create_top_listing_request_success(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "kind": TokenKind.TOP_TOKEN,
+            "name": "NewTop",
+            "symbol": "NEWTP",
+            "trading_view_symbol": "NEWTPUSD",
+            "network": "Ethereum",
+            "binance_symbol": "NEWTPUSDT",
+            "token_type": "TOP_TOKEN",
+            "coingecko_id": "newtop",
+        }
+        resp = self.client.post(self.list_url, payload, format="multipart")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(TokenListingRequest.objects.filter(symbol="NEWTP").count(), 1)
+        req = TokenListingRequest.objects.get(symbol="NEWTP")
+        self.assertEqual(req.user, self.user1)
+        self.assertEqual(req.status, ListingStatus.PENDING)
+
+    def test_create_gaming_listing_request_success(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "kind": TokenKind.GAMING_TOKEN,
+            "name": "NewGame",
+            "symbol": "NEWG",
+            "trading_view_symbol": "NEWGUSD",
+            "network": "Polygon",
+            "pool_address": "0xdeadbeef",
+        }
+        resp = self.client.post(self.list_url, payload, format="multipart")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(TokenListingRequest.objects.filter(symbol="NEWG").count(), 1)
+        req = TokenListingRequest.objects.get(symbol="NEWG")
+        self.assertEqual(req.user, self.user1)
+        self.assertEqual(req.status, ListingStatus.PENDING)
+
+    def test_create_fails_if_missing_kind_specific_fields(self):
+        self.client.force_authenticate(user=self.user1)
+        # Missing coingecko/binance/token_type for top
+        payload_top = {
+            "kind": TokenKind.TOP_TOKEN if hasattr(TokenKind, "TOP_TOKEN") else "top",
+            "name": "BadTop",
+            "symbol": "BADTP",
+            "trading_view_symbol": "BADTPUSD",
+            "network": "Ethereum",
+            "token_type": "TOP_TOKEN",
+            "coingecko_id": "newtop",
+            # missing binance_symbol
+        }
+        resp_top = self.client.post(self.list_url, payload_top, format="multipart")
+        self.assertEqual(resp_top.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("binance_symbol", resp_top.data)
+
+        payload_top = {
+            "kind": TokenKind.TOP_TOKEN if hasattr(TokenKind, "TOP_TOKEN") else "top",
+            "name": "BadTop",
+            "symbol": "BADTP",
+            "trading_view_symbol": "BADTPUSD",
+            "network": "Ethereum",
+            "binance_symbol": "NEWTPUSDT",
+            "coingecko_id": "newtop",
+            # missing token_type
+        }
+        resp_top = self.client.post(self.list_url, payload_top, format="multipart")
+        self.assertEqual(resp_top.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("token_type", resp_top.data)
+
+        payload_top = {
+            "kind": TokenKind.TOP_TOKEN if hasattr(TokenKind, "TOP_TOKEN") else "top",
+            "name": "BadTop",
+            "symbol": "BADTP",
+            "trading_view_symbol": "BADTPUSD",
+            "network": "Ethereum",
+            "binance_symbol": "NEWTPUSDT",
+            "token_type": "TOP_TOKEN",
+            # missing coingecko_id
+        }
+        resp_top = self.client.post(self.list_url, payload_top, format="multipart")
+        self.assertEqual(resp_top.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("coingecko_id", resp_top.data)
+
+        # Missing pool_address/network for gaming
+        payload_game = {
+            "kind": TokenKind.GAMING_TOKEN,
+            "name": "BadGame",
+            "symbol": "BADG",
+            "trading_view_symbol": "BADGUSD",
+            "network": "Polygon",
+            # missing pool_address
+        }
+        resp_game = self.client.post(self.list_url, payload_game, format="multipart")
+        self.assertEqual(resp_game.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("pool_address", resp_game.data)
+
+        payload_game = {
+            "kind": TokenKind.GAMING_TOKEN,
+            "name": "BadGame",
+            "symbol": "BADG",
+            "trading_view_symbol": "BADGUSD",
+            "pool_address": "0xdeadbeef",
+            # missing network
+        }
+        resp_game = self.client.post(self.list_url, payload_game, format="multipart")
+        self.assertEqual(resp_game.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("network", resp_game.data)
+
+    def test_cannot_request_symbol_existing_in_production(self):
+        # EXTOP already exists as TopToken in setUp
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "kind": TokenKind.TOP_TOKEN if hasattr(TokenKind, "TOP_TOKEN") else "top",
+            "name": "SomeTop",
+            "symbol": "EXTOP",  # existing production symbol
+            "trading_view_symbol": "EXTOPUSD",
+            "network": "Ethereum",
+            "binance_symbol": "SOMETPUSDT",
+            "token_type": "TOP_TOKEN",
+            "coingecko_id": "sometop",
+        }
+        resp = self.client.post(self.list_url, payload, format="multipart")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("symbol", resp.data)
+
+    def test_duplicate_listing_request_prevention(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "kind": TokenKind.GAMING_TOKEN,
+            "name": "DupGame",
+            "symbol": "DUPG",
+            "trading_view_symbol": "DUPGUSD",
+            "network": "Polygon",
+            "pool_address": "0x111",
+        }
+        resp1 = self.client.post(self.list_url, payload, format="multipart")
+        self.assertEqual(resp1.status_code, status.HTTP_201_CREATED)
+
+        # Another attempt with same symbol should fail (unique=True on symbol)
+        resp2 = self.client.post(self.list_url, payload, format="multipart")
+        self.assertIn(
+            resp2.status_code, (status.HTTP_400_BAD_REQUEST, status.HTTP_409_CONFLICT)
+        )
+
+    def test_user_can_update_own_pending_request(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "kind": TokenKind.GAMING_TOKEN,
+            "name": "EditableGame",
+            "symbol": "EDG",
+            "trading_view_symbol": "EDGUSD",
+            "network": "Polygon",
+            "pool_address": "0x222",
+        }
+        create = self.client.post(self.list_url, payload, format="multipart")
+        self.assertEqual(create.status_code, status.HTTP_201_CREATED)
+        req_id = create.data["id"]
+
+        detail = self._detail_url(req_id)
+        update_payload = payload.copy()
+        update_payload["name"] = "EditedGame"
+        resp = self.client.put(detail, update_payload, format="multipart")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["name"], "EditedGame")
+
+    def test_user_cannot_update_others_request(self):
+        # user1 creates
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "kind": TokenKind.GAMING_TOKEN,
+            "name": "OtherGame",
+            "symbol": "OTG",
+            "trading_view_symbol": "OTGUSD",
+            "network": "Polygon",
+            "pool_address": "0x333",
+        }
+        create = self.client.post(self.list_url, payload, format="multipart")
+        req_id = create.data["id"]
+
+        # user2 tries to update
+        self.client.force_authenticate(user=self.user2)
+        detail = self._detail_url(req_id)
+        update_payload = payload.copy()
+        update_payload["name"] = "Hacked"
+        resp = self.client.put(detail, update_payload, format="multipart")
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_user_cannot_update_non_pending(self):
+        # create and have admin approve it
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "kind": TokenKind.GAMING_TOKEN,
+            "name": "ToApprove",
+            "symbol": "TAP",
+            "trading_view_symbol": "TAPUSD",
+            "network": "Polygon",
+            "pool_address": "0x444",
+        }
+        create = self.client.post(self.list_url, payload, format="multipart")
+        req_id = create.data["id"]
+
+        # admin approve
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(self._approve_url(req_id))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        # original user tries to update -> should be 400 (not allowed because not pending)
+        self.client.force_authenticate(user=self.user1)
+        detail = self._detail_url(req_id)
+        update_payload = payload.copy()
+        update_payload["name"] = "ShouldFail"
+        resp2 = self.client.put(detail, update_payload, format="multipart")
+        self.assertEqual(resp2.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_admin_cannot_update_or_delete(self):
+        # user1 creates a request
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "kind": TokenKind.TOP_TOKEN,
+            "name": "AdminTry",
+            "symbol": "ADMTRY",
+            "trading_view_symbol": "ADMTRYUSD",
+            "network": "Ethereum",
+            "binance_symbol": "ADMTRYUSDT",
+            "token_type": "TOP_TOKEN",
+            "coingecko_id": "admtry",
+        }
+        create = self.client.post(self.list_url, payload, format="multipart")
+        req_id = create.data["id"]
+
+        # admin attempts update
+        self.client.force_authenticate(user=self.admin)
+        detail = self._detail_url(req_id)
+        update_payload = payload.copy()
+        update_payload["name"] = "AdminEdited"
+        resp = self.client.put(detail, update_payload, format="multipart")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+        # admin attempts delete
+        resp2 = self.client.delete(detail)
+        self.assertEqual(resp2.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_approve_creates_production_token(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "kind": TokenKind.TOP_TOKEN,
+            "name": "MakeRealTop",
+            "symbol": "MRTOP",
+            "trading_view_symbol": "MRTOPUSD",
+            "network": "Ethereum",
+            "binance_symbol": "MRTOPUSDT",
+            "token_type": "TOP_TOKEN",
+            "coingecko_id": "mrtop",
+        }
+        create = self.client.post(self.list_url, payload, format="multipart")
+        req_id = create.data["id"]
+
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(self._approve_url(req_id))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        # check token created
+        self.assertTrue(TopToken.objects.filter(symbol="MRTOP").exists())
+        req = TokenListingRequest.objects.get(id=req_id)
+        self.assertEqual(req.status, ListingStatus.APPROVED)
+        self.assertEqual(req.processed_by, self.admin)
+
+    def test_admin_reject_marks_rejected_and_no_token_created(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "kind": TokenKind.GAMING_TOKEN,
+            "name": "RejectMe",
+            "symbol": "REJ1",
+            "trading_view_symbol": "REJ1USD",
+            "network": "Polygon",
+            "pool_address": "0x555",
+        }
+        create = self.client.post(self.list_url, payload, format="multipart")
+        req_id = create.data["id"]
+
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(
+            self._reject_url(req_id), data={"admin_note": "spam"}, format="json"
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        req = TokenListingRequest.objects.get(id=req_id)
+        self.assertEqual(req.status, ListingStatus.REJECTED)
+        self.assertEqual(req.processed_by, self.admin)
+        self.assertFalse(GamingToken.objects.filter(symbol="REJ1").exists())
