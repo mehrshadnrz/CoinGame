@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import GamingToken, TopToken
+from .models import GamingToken, TopToken, TokenUpdateRequest
 
 
 # TODO: Add RANK, USER SCORE, FINAL SCORE,
@@ -152,3 +152,23 @@ class TopTokenAdmin(admin.ModelAdmin):
         ),
         ("Timestamps", {"fields": ("created_at", "updated_at")}),
     )
+
+
+@admin.register(TokenUpdateRequest)
+class TokenUpdateRequestAdmin(admin.ModelAdmin):
+    list_display = [
+        "user",
+        "top_token",
+        "gaming_token",
+        "created_at",
+    ]
+    readonly_fields = (
+        "user",
+        "top_token",
+        "gaming_token",
+        "created_at",
+    )
+    search_fields = [
+        "top_token__name",
+        "gaming_token__name",
+    ]
