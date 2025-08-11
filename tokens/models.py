@@ -84,10 +84,7 @@ class CoinToken(models.Model):
         verbose_name="Token Contract URL",
     )
 
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        db_index=True,
-    )
+    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -171,6 +168,7 @@ class TokenUpdateRequest(models.Model):
         on_delete=models.CASCADE,
         null=False,
         blank=False,
+        related_name="token_update_requests",
         verbose_name="User",
     )
 
@@ -180,6 +178,7 @@ class TokenUpdateRequest(models.Model):
         null=True,
         blank=True,
         on_delete=models.CASCADE,
+        related_name="token_update_requests",
         verbose_name="Top Token",
     )
     gaming_token = models.ForeignKey(
@@ -187,6 +186,7 @@ class TokenUpdateRequest(models.Model):
         null=True,
         blank=True,
         on_delete=models.CASCADE,
+        related_name="token_update_requests",
         verbose_name="Gamin Token",
     )
 
