@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.db.utils import IntegrityError
-from tokens.models import GamingToken, TopToken, TokenTypes
+from tokens.models import GamingToken, TopToken, TopTokenTypes
 
 
 class GamingTokenModelTest(TestCase):
@@ -65,9 +65,9 @@ class TopTokenModelTest(TestCase):
             security_badge=True,
             trading_view_symbol="TPCUSD",
             binance_symbol="TOPCOINUSDT",
-            token_type=TokenTypes.TOP_TOKEN,
+            token_type=TopTokenTypes.TOP_TOKEN,
             coingecko_id="topcoin",
         )
         self.assertEqual(token.name, "TopCoin")
-        self.assertEqual(token.token_type, TokenTypes.TOP_TOKEN)
+        self.assertEqual(token.token_type, TopTokenTypes.TOP_TOKEN)
         self.assertEqual(str(token), "TopCoin (TPC)")
