@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "tokens",
     "user",
     "post",
+    "advertisement",
 ]
 
 MIDDLEWARE = [

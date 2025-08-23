@@ -23,10 +23,20 @@ class GamingTokenViewSet(viewsets.ModelViewSet):
     queryset = GamingToken.objects.all()
     serializer_class = GamingTokenSerializer
 
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [permissions.AllowAny()]
+        return [permissions.IsAdminUser()]
+
 
 class TopTokenViewSet(viewsets.ModelViewSet):
     queryset = TopToken.objects.all()
     serializer_class = TopTokenSerializer
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [permissions.AllowAny()]
+        return [permissions.IsAdminUser()]
 
 
 class TokenUpdateRequestViewSet(viewsets.ModelViewSet):
