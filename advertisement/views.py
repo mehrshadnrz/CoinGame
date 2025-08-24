@@ -1,3 +1,4 @@
+from drf_spectacular.utils import OpenApiResponse, OpenApiTypes, extend_schema
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -40,6 +41,33 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
             headers=headers,
         )
 
+    @extend_schema(
+        description="Admin: Set payment status for this advertisement.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "has_payment": {"type": "boolean", "example": True},
+                },
+                "required": ["has_payment"],
+            }
+        },
+        responses={
+            200: OpenApiResponse(
+                description="Payment updated",
+                response={
+                    "application/json": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer", "example": 12},
+                            "has_payment": {"type": "boolean", "example": True},
+                        },
+                    }
+                },
+            ),
+            400: OpenApiResponse(description="Missing required field"),
+        },
+    )
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
     def set_payment(self, request, pk=None):
         ad = self.get_object()
@@ -55,6 +83,33 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
         ad.save()
         return Response({"id": ad.id, "has_payment": ad.has_payment})
 
+    @extend_schema(
+        description="Admin: Select this ad for display on site. Only one ad can be active at a time.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "display_ad": {"type": "boolean", "example": True},
+                },
+                "required": ["display_ad"],
+            }
+        },
+        responses={
+            200: OpenApiResponse(
+                description="Display status updated",
+                response={
+                    "application/json": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer", "example": 12},
+                            "display_ad": {"type": "boolean", "example": True},
+                        },
+                    }
+                },
+            ),
+            400: OpenApiResponse(description="Missing required field"),
+        },
+    )
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
     def set_display(self, request, pk=None):
         """Admin: select this ad for display"""

@@ -1,4 +1,5 @@
 from django.db import IntegrityError, transaction
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -65,6 +66,28 @@ class TokenUpdateRequestViewSet(viewsets.ModelViewSet):
             headers=headers,
         )
 
+    @extend_schema(
+        description="Accept a token update request. This will apply the update and delete the request.",
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                description="Update request accepted",
+                response={
+                    "application/json": {
+                        "type": "object",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "example": "Token update accepted",
+                            }
+                        },
+                    }
+                },
+            ),
+            400: OpenApiResponse(description="Invalid token request"),
+            404: OpenApiResponse(description="Request not found"),
+        },
+    )
     @action(detail=True, methods=["post"])
     def accept(self, request, pk=None):
         try:
@@ -122,6 +145,28 @@ class TokenListingRequestViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    @extend_schema(
+        description="Approve a token listing request. Admin only.",
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                description="Request approved and token created",
+                response={
+                    "application/json": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {"type": "string", "example": "Approved"},
+                            "token_id": {"type": "integer", "example": 42},
+                        },
+                    }
+                },
+            ),
+            400: OpenApiResponse(
+                description="Request already processed or token exists"
+            ),
+            500: OpenApiResponse(description="Integrity error while creating token"),
+        },
+    )
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
         req = self.get_object()
@@ -212,6 +257,35 @@ class TokenListingRequestViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @extend_schema(
+        description="Reject a token listing request. Admin only.",
+        request={
+            "application/json": {
+                "type": "object",
+                "properties": {
+                    "admin_note": {
+                        "type": "string",
+                        "example": "Token does not meet requirements",
+                    }
+                },
+                "required": ["admin_note"],
+            }
+        },
+        responses={
+            200: OpenApiResponse(
+                description="Request rejected",
+                response={
+                    "application/json": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {"type": "string", "example": "Rejected"}
+                        },
+                    }
+                },
+            ),
+            400: OpenApiResponse(description="Request already processed"),
+        },
+    )
     @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):
         req = self.get_object()
