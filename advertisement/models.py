@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
@@ -32,6 +33,14 @@ class AdvertisementPlan(models.Model):
 
 
 class Advertisement(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
+        related_name="advertisements",
+        verbose_name="User",
+    )
     plan = models.ForeignKey(
         AdvertisementPlan,
         on_delete=models.CASCADE,
@@ -67,19 +76,27 @@ class Advertisement(models.Model):
         null=True,
         verbose_name=_("Description"),
     )
+    has_payment = models.BooleanField(default=False, verbose_name=_("Has payment"))
+    display_ad = models.BooleanField(
+        default=False, verbose_name=_("Selected for Display")
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(blank=True, null=True, editable=False)
-
-    def save(self, *args, **kwargs):
-        if not self.expires_at and self.plan:
-            self.expires_at = self.created_at + timedelta(
-                days=30 * self.plan.period_months
-            )
-        super().save(*args, **kwargs)
 
     @property
     def is_active(self):
         return self.expires_at is None or self.expires_at > now()
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at and self.plan:
+            self.expires_at = (self.created_at or now()) + timedelta(
+                days=30 * self.plan.duration_in_months
+            )
+
+        if self.display_ad:
+            Advertisement.objects.exclude(pk=self.pk).update(display_ad=False)
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Ad #{self.id} ({self.plan.name})"

@@ -16,3 +16,11 @@ class AdvertisementSerializer(serializers.ModelSerializer):
     class Meta:
         model = Advertisement
         fields = "__all__"
+        read_only_fields = [
+            "user",
+            "has_payment",
+            "display_ad",
+            "expires_at",
+            "created_at",
+            "is_active",
+        ]
