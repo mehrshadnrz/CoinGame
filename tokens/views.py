@@ -9,12 +9,16 @@ from tokens.models import (
     ListingStatus,
     TokenKind,
     TokenListingRequest,
+    TokenPromotionPlan,
+    TokenPromotionRequest,
     TokenUpdateRequest,
     TopToken,
 )
 from tokens.serializers import (
     GamingTokenSerializer,
     TokenListingRequestSerializer,
+    TokenPromotionPlanSerializer,
+    TokenPromotionRequestSerializer,
     TokenUpdateRequestSerializer,
     TopTokenSerializer,
 )
@@ -365,3 +369,187 @@ class TokenListingRequestViewSet(viewsets.ModelViewSet):
                 pass
 
         return response
+
+
+class TokenPromotionPlanViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for promotion plans.
+    - Public: list/retrieve (to show available plans to users).
+    - Admin: create/update/delete.
+    """
+
+    queryset = TokenPromotionPlan.objects.all().order_by("cost_usd")
+    serializer_class = TokenPromotionPlanSerializer
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [permissions.AllowAny()]
+        return [permissions.IsAdminUser()]
+
+
+class TokenPromotionRequestViewSet(viewsets.ModelViewSet):
+    """
+    Promotion requests created by users.
+    - User: create/list/retrieve their own requests.
+    - Admin: list all requests, mark payment, etc.
+    """
+
+    queryset = TokenPromotionRequest.objects.all().order_by("-created_at")
+    serializer_class = TokenPromotionRequestSerializer
+
+    def get_permissions(self):
+        if self.action in ["mark_paid", "activate", "deactivate"]:
+            return [permissions.IsAdminUser()]
+        return [permissions.IsAuthenticated()]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return self.queryset
+        return self.queryset.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @extend_schema(
+        description="Mark a promotion request as paid (admin only).",
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                description="Payment successfully marked.",
+                response={
+                    "application/json": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {
+                                "type": "string",
+                                "example": "Payment marked as received.",
+                            }
+                        },
+                    }
+                },
+            ),
+            400: OpenApiResponse(description="Payment already marked."),
+        },
+    )
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
+    def mark_paid(self, request, pk=None):
+        """
+        Mark a promotion request as paid (admin only).
+        """
+        promotion_request = self.get_object()
+        if promotion_request.has_payment:
+            return Response(
+                {"detail": "Payment already marked."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        promotion_request.has_payment = True
+        promotion_request.save()
+        return Response(
+            {"detail": "Payment marked as received."}, status=status.HTTP_200_OK
+        )
+
+    @extend_schema(
+        description="Activate a promotion request -> mark its token as promoted (admin only).",
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                description="Token activated (promoted).",
+                response={
+                    "application/json": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {
+                                "type": "string",
+                                "example": "Token 42 activated (promoted).",
+                            }
+                        },
+                    }
+                },
+            ),
+            400: OpenApiResponse(description="No token attached to this request."),
+        },
+    )
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
+    def activate(self, request, pk=None):
+        """
+        Activate a promotion request -> mark its token as promoted.
+        """
+        promotion_request = self.get_object()
+
+        token = promotion_request.top_token or promotion_request.gaming_token
+        if not token:
+            return Response(
+                {"detail": "No token attached to this request."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        token.promoted = True
+        token.save()
+        promotion_request.is_active = True
+        promotion_request.save()
+
+        return Response(
+            {"detail": f"Token {token.id} activated (promoted)."},
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        description="Deactivate a promotion request -> mark its token as not promoted (admin only).",
+        request=None,
+        responses={
+            200: OpenApiResponse(
+                description="Token deactivated (unpromoted).",
+                response={
+                    "application/json": {
+                        "type": "object",
+                        "properties": {
+                            "detail": {
+                                "type": "string",
+                                "example": "Token 42 deactivated (unpromoted).",
+                            }
+                        },
+                    }
+                },
+            ),
+            400: OpenApiResponse(description="No token attached to this request."),
+        },
+    )
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAdminUser])
+    def deactivate(self, request, pk=None):
+        """
+        Deactivate a promotion request -> mark its token as not promoted.
+        """
+        promotion_request = self.get_object()
+
+        token = promotion_request.top_token or promotion_request.gaming_token
+        if not token:
+            return Response(
+                {"detail": "No token attached to this request."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        token.promoted = False
+        token.save()
+        promotion_request.is_active = False
+        promotion_request.save()
+
+        return Response(
+            {"detail": f"Token {token.id} deactivated (unpromoted)."},
+            status=status.HTTP_200_OK,
+        )
+
+    @extend_schema(
+        description="Delete a promotion request. "
+        "⚠ If the request is active, it will first be deactivated "
+        "(token.promoted=False, is_active=False) before deletion."
+    )
+    def perform_destroy(self, instance):
+        # If active, deactivate first
+        if instance.is_active:
+            token = instance.top_token or instance.gaming_token
+            if token:
+                token.promoted = False
+                token.save()
+            instance.is_active = False
+            instance.save()
+        super().perform_destroy(instance)

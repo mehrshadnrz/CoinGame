@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -8,9 +11,11 @@ from tokens.models import (
     ListingStatus,
     TokenKind,
     TokenListingRequest,
-    TopTokenTypes,
+    TokenPromotionPlan,
+    TokenPromotionRequest,
     TokenUpdateRequest,
     TopToken,
+    TopTokenTypes,
 )
 
 User = get_user_model()
@@ -687,3 +692,219 @@ class TokenListingRequestTests(APITestCase):
         self.assertEqual(req.status, ListingStatus.REJECTED)
         self.assertEqual(req.processed_by, self.admin)
         self.assertFalse(GamingToken.objects.filter(symbol="REJ1").exists())
+
+
+class TokenPromotionRequestTests(APITestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(username="user1", password="pass")
+        self.user2 = User.objects.create_user(username="user2", password="pass2")
+        self.admin = User.objects.create_user(
+            username="admin", password="adminpass", is_staff=True
+        )
+
+        self.plan = TokenPromotionPlan.objects.create(
+            name="Basic", duration_in_months=1, cost_usd=100
+        )
+
+        self.top_token = TopToken.objects.create(
+            name="TopPromo",
+            symbol="TPR",
+            trading_view_symbol="TPRUSD",
+            binance_symbol="TPRUSDT",
+            coingecko_id="tpr",
+            token_type=TopTokenTypes.TOP_TOKEN,
+            promoted=False,
+        )
+
+        self.gaming_token = GamingToken.objects.create(
+            name="GamePromo",
+            symbol="GPR",
+            trading_view_symbol="GPRUSD",
+            network="Ethereum",
+            pool_address="0xpromo",
+            promoted=False,
+        )
+
+        self.list_url = reverse("promotion-request-list")
+
+    def _detail_url(self, pk):
+        return reverse("promotion-request-detail", args=[pk])
+
+    def _activate_url(self, pk):
+        return reverse("promotion-request-activate", args=[pk])
+
+    def _deactivate_url(self, pk):
+        return reverse("promotion-request-deactivate", args=[pk])
+
+    def _mark_paid_url(self, pk):
+        return reverse("promotion-request-mark-paid", args=[pk])
+
+    # ---------- Creation & validation ----------
+
+    def test_create_promotion_request_top_token_success(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {"plan": self.plan.id, "top_token": self.top_token.id}
+        resp = self.client.post(self.list_url, payload)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        req = TokenPromotionRequest.objects.get(id=resp.data["id"])
+        self.assertEqual(req.user, self.user1)
+        self.assertIsNotNone(req.expires_at)
+        self.assertFalse(req.is_active)
+        self.top_token.refresh_from_db()
+        self.assertFalse(self.top_token.promoted)
+
+    def test_create_promotion_request_gaming_token_success(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {"plan": self.plan.id, "gaming_token": self.gaming_token.id}
+        resp = self.client.post(self.list_url, payload)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(TokenPromotionRequest.objects.count(), 1)
+
+    def test_create_requires_plan(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {"top_token": self.top_token.id}
+        resp = self.client.post(self.list_url, payload)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("plan", resp.data)
+
+    def test_user_cannot_create_request_with_both_tokens(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {
+            "plan": self.plan.id,
+            "top_token": self.top_token.id,
+            "gaming_token": self.gaming_token.id,
+        }
+        resp = self.client.post(self.list_url, payload)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("non_field_errors", resp.data)
+
+    def test_user_cannot_create_request_without_any_token(self):
+        self.client.force_authenticate(user=self.user1)
+        payload = {"plan": self.plan.id}
+        resp = self.client.post(self.list_url, payload)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("non_field_errors", resp.data)
+
+    # ---------- Visibility ----------
+
+    def test_user_sees_only_own_requests(self):
+        self.client.force_authenticate(user=self.user1)
+        self.client.post(
+            self.list_url, {"plan": self.plan.id, "top_token": self.top_token.id}
+        )
+
+        self.client.force_authenticate(user=self.user2)
+        self.client.post(
+            self.list_url, {"plan": self.plan.id, "gaming_token": self.gaming_token.id}
+        )
+
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get(self.list_url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        # Only user1's request
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["user"], self.user1.id)
+
+    def test_admin_sees_all_requests(self):
+        self.client.force_authenticate(user=self.user1)
+        self.client.post(
+            self.list_url, {"plan": self.plan.id, "top_token": self.top_token.id}
+        )
+        self.client.force_authenticate(user=self.user2)
+        self.client.post(
+            self.list_url, {"plan": self.plan.id, "gaming_token": self.gaming_token.id}
+        )
+
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.get(self.list_url)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data), 2)
+
+    # ---------- Admin actions ----------
+
+    def test_admin_can_activate_then_deactivate(self):
+        # create request
+        self.client.force_authenticate(user=self.user1)
+        r = self.client.post(
+            self.list_url, {"plan": self.plan.id, "top_token": self.top_token.id}
+        )
+        req_id = r.data["id"]
+
+        # activate
+        self.client.force_authenticate(user=self.admin)
+        a = self.client.post(self._activate_url(req_id))
+        self.assertEqual(a.status_code, status.HTTP_200_OK)
+        self.top_token.refresh_from_db()
+        self.assertTrue(self.top_token.promoted)
+
+        # deactivate
+        d = self.client.post(self._deactivate_url(req_id))
+        self.assertEqual(d.status_code, status.HTTP_200_OK)
+        self.top_token.refresh_from_db()
+        self.assertFalse(self.top_token.promoted)
+
+    def test_non_admin_cannot_activate_deactivate_or_mark_paid(self):
+        self.client.force_authenticate(user=self.user1)
+        r = self.client.post(
+            self.list_url, {"plan": self.plan.id, "gaming_token": self.gaming_token.id}
+        )
+        req_id = r.data["id"]
+
+        self.client.force_authenticate(user=self.user1)
+        self.assertEqual(
+            self.client.post(self._activate_url(req_id)).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.post(self._deactivate_url(req_id)).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            self.client.post(self._mark_paid_url(req_id)).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_admin_mark_paid_idempotent(self):
+        self.client.force_authenticate(user=self.user1)
+        r = self.client.post(
+            self.list_url, {"plan": self.plan.id, "top_token": self.top_token.id}
+        )
+        req_id = r.data["id"]
+
+        self.client.force_authenticate(user=self.admin)
+        first = self.client.post(self._mark_paid_url(req_id))
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+
+        second = self.client.post(self._mark_paid_url(req_id))
+        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("detail", second.data)
+
+    # ---------- Deletion behavior ----------
+
+    def test_user_delete_active_request_first_deactivates_token(self):
+        """
+        If the request is 'active' and the token was promoted via activation,
+        deleting the request should leave token.unpromoted (view should deactivate before delete).
+        """
+        # create + activate
+        self.client.force_authenticate(user=self.user1)
+        r = self.client.post(
+            self.list_url, {"plan": self.plan.id, "top_token": self.top_token.id}
+        )
+        req_id = r.data["id"]
+
+        self.client.force_authenticate(user=self.admin)
+        self.client.post(self._activate_url(req_id))
+        self.top_token.refresh_from_db()
+        self.assertTrue(self.top_token.promoted)
+
+        # delete by owner
+        self.client.force_authenticate(user=self.user1)
+        d = self.client.delete(self._detail_url(req_id))
+        self.assertEqual(d.status_code, status.HTTP_204_NO_CONTENT)
+
+        # token should no longer be promoted, request gone
+        self.top_token.refresh_from_db()
+        self.assertFalse(self.top_token.promoted)
+        self.assertFalse(TokenPromotionRequest.objects.filter(id=req_id).exists())

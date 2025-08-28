@@ -6,14 +6,28 @@ from tokens.views import (
     TokenListingRequestViewSet,
     TokenUpdateRequestViewSet,
     TopTokenViewSet,
+    TokenPromotionPlanViewSet,
+    TokenPromotionRequestViewSet,
 )
 
 router = DefaultRouter()
-router.register(r'gaming-tokens', GamingTokenViewSet, basename='gaming-token')
-router.register(r'top-tokens', TopTokenViewSet, basename='top-token')
-router.register(r'update-requests', TokenUpdateRequestViewSet, basename='token-update-request')
-router.register(r"token-listing-requests", TokenListingRequestViewSet, basename="token-listing-request")
+router.register(r"gaming-tokens", GamingTokenViewSet, basename="gaming-token")
+router.register(r"top-tokens", TopTokenViewSet, basename="top-token")
+router.register(
+    r"update-requests", TokenUpdateRequestViewSet, basename="token-update-request"
+)
+router.register(
+    r"promotion-plans", TokenPromotionPlanViewSet, basename="promotion-plan"
+)
+router.register(
+    r"token-listing-requests",
+    TokenListingRequestViewSet,
+    basename="token-listing-request",
+)
+router.register(
+    r"promotion-requests", TokenPromotionRequestViewSet, basename="promotion-request"
+)
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path("", include(router.urls)),
 ]

@@ -7,6 +7,8 @@ from tokens.models import (
     TokenListingRequest,
     TokenUpdateRequest,
     TopToken,
+    TokenPromotionPlan,
+    TokenPromotionRequest,
 )
 
 
@@ -252,6 +254,57 @@ class TokenListingRequestSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get("request", None)
+        if request and hasattr(request, "user"):
+            validated_data["user"] = request.user
+        return super().create(validated_data)
+
+
+class TokenPromotionPlanSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TokenPromotionPlan
+        fields = [
+            "id",
+            "name",
+            "duration_in_months",
+            "cost_usd",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+
+class TokenPromotionRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TokenPromotionRequest
+        fields = [
+            "id",
+            "user",
+            "plan",
+            "top_token",
+            "gaming_token",
+            "has_payment",
+            "expires_at",
+            "created_at",
+            "is_active",
+        ]
+        read_only_fields = [
+            "id",
+            "user",
+            "expires_at",
+            "created_at",
+            "is_active",
+        ]
+
+    def validate(self, data):
+        top_token = data.get("top_token")
+        gaming_token = data.get("gaming_token")
+        if bool(top_token) == bool(gaming_token):
+            raise serializers.ValidationError(
+                "Exactly one of top_token or gaming_token must be set."
+            )
+        return data
+
+    def create(self, validated_data):
+        request = self.context.get("request")
         if request and hasattr(request, "user"):
             validated_data["user"] = request.user
         return super().create(validated_data)
