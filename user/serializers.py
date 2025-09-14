@@ -5,13 +5,24 @@ User = get_user_model()
 
 class UserSignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+    repeat_password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ('username', 'password')
+        fields = ("first_name", "last_name", "email", "password", "repeat_password")
+
+    def validate(self, data):
+        if data["password"] != data["repeat_password"]:
+            raise serializers.ValidationError("Passwords do not match.")
+        return data
 
     def create(self, validated_data):
-        user = User(username=validated_data['username'])
-        user.set_password(validated_data['password'])
+        validated_data.pop("repeat_password")
+        user = User(
+            first_name=validated_data["first_name"],
+            last_name=validated_data["last_name"],
+            email=validated_data["email"],
+        )
+        user.set_password(validated_data["password"])
         user.save()
         return user

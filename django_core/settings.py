@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "drf_spectacular",
     # Local Apps
+    "config",
     "tokens",
     "user",
     "post",
