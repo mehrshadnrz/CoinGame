@@ -9,6 +9,7 @@ djangorestframework = "==3.16.0"
 django-allauth = "==65.10.0"
 pillow = "*"
 drf-spectacular = "*"
+django-cors-headers = "*"
 
 [dev-packages]
 
