@@ -20,29 +20,39 @@ class MarketStatistics(models.Model):
         return "Market Statistics"
 
 
-class CryptoCoins(models.Model):
-    CATEGORY_CHOICES = [
-        ("gaming", "Gaming"),
-        ("top", "Top"),
-    ]
+class Category(models.Model):
+    name = models.CharField(max_length=50, unique=True)
 
+    def __str__(self):
+        return self.name
+
+
+class CryptoCoins(models.Model):
     rank = models.PositiveIntegerField()
     name = models.CharField(max_length=50)
     symbol = models.CharField(max_length=10)
     price = models.DecimalField(max_digits=20, decimal_places=2)
-    percent_change_1h = models.DecimalField(max_digits=6, decimal_places=2, help_text="Change in %")
-    percent_change_24h = models.DecimalField(max_digits=6, decimal_places=2, help_text="Change in %")
-    percent_change_7d = models.DecimalField(max_digits=6, decimal_places=2, help_text="Change in %")
-    market_cap = models.CharField(max_length=20)  # keep string to store values like "2.28T"
+    percent_change_1h = models.DecimalField(
+        max_digits=6, decimal_places=2, help_text="Change in %"
+    )
+    percent_change_24h = models.DecimalField(
+        max_digits=6, decimal_places=2, help_text="Change in %"
+    )
+    percent_change_7d = models.DecimalField(
+        max_digits=6, decimal_places=2, help_text="Change in %"
+    )
+    market_cap = models.CharField(max_length=20)
     volume_24h = models.CharField(max_length=20)
     circulating_supply = models.CharField(max_length=30)
+    promoted = models.BooleanField(default=False)
+    security_badge = models.BooleanField(default=False)
 
-    category = models.CharField(
-        max_length=10,
-        choices=CATEGORY_CHOICES,
-        blank=True,
+    category = models.ForeignKey(
+        Category,
+        related_name="coins",
+        on_delete=models.SET_NULL,
         null=True,
-        help_text="Crypto category (Gaming or Top)",
+        blank=True,
     )
 
     class Meta:
@@ -50,4 +60,3 @@ class CryptoCoins(models.Model):
 
     def __str__(self):
         return f"{self.rank}. {self.name} ({self.symbol})"
-

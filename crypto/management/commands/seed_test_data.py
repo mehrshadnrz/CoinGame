@@ -1,10 +1,10 @@
 from django.core.management.base import BaseCommand
-from crypto.models import MarketStatistics, CryptoCoins
+from crypto.models import MarketStatistics, CryptoCoins, Category
 from config.models import SiteConfig
 
 
 class Command(BaseCommand):
-    help = "Seed database with test data for MarketStatistics, CryptoCoins, and SiteConfig"
+    help = "Seed database with test data for MarketStatistics, CryptoCoins, SiteConfig, and Categories"
 
     def handle(self, *args, **options):
         # Create MarketStatistics (only one allowed)
@@ -17,7 +17,7 @@ class Command(BaseCommand):
                 vol_24h="150B",
                 vol_24h_percent="10%",
                 dominance="BTC 55%, ETH 20%",
-                fear_and_greed="55/100",
+                fear_and_greed="Greed (75)",
             )
             self.stdout.write(self.style.SUCCESS("✅ MarketStatistics created."))
         else:
@@ -28,7 +28,7 @@ class Command(BaseCommand):
             SiteConfig.objects.create(
                 about_us="We are a test crypto exchange site.",
                 contact_email="support@testcrypto.com",
-                contact_phone="09123456789",
+                contact_phone="+123456789",
                 address="123 Blockchain Street, Cryptoville",
                 facebook_url="https://facebook.com/testcrypto",
                 twitter_url="https://twitter.com/testcrypto",
@@ -40,7 +40,17 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.WARNING("⚠️ SiteConfig already exists, skipped."))
 
-        # Create some CryptoCoins
+        # Create Categories
+        categories_map = {}
+        for cat_name in ["Gaming", "Top"]:
+            category, created = Category.objects.get_or_create(name=cat_name)
+            categories_map[cat_name.lower()] = category
+            if created:
+                self.stdout.write(self.style.SUCCESS(f"✅ Category '{cat_name}' created."))
+            else:
+                self.stdout.write(self.style.WARNING(f"⚠️ Category '{cat_name}' already exists."))
+
+        # Create CryptoCoins
         if not CryptoCoins.objects.exists():
             coins = [
                 {
@@ -54,7 +64,9 @@ class Command(BaseCommand):
                     "market_cap": "2.28T",
                     "volume_24h": "58.22B",
                     "circulating_supply": "19.9M BTC",
-                    "category": "top",
+                    "promoted": True,
+                    "security_badge": True,
+                    "category": categories_map["top"],
                 },
                 {
                     "rank": 2,
@@ -67,7 +79,9 @@ class Command(BaseCommand):
                     "market_cap": "439.63B",
                     "volume_24h": "33.83B",
                     "circulating_supply": "120.7M ETH",
-                    "category": "top",
+                    "promoted": False,
+                    "security_badge": True,
+                    "category": categories_map["top"],
                 },
                 {
                     "rank": 3,
@@ -80,7 +94,9 @@ class Command(BaseCommand):
                     "market_cap": "900M",
                     "volume_24h": "120M",
                     "circulating_supply": "150M AXS",
-                    "category": "gaming",
+                    "promoted": False,
+                    "security_badge": False,
+                    "category": categories_map["gaming"],
                 },
             ]
             for coin in coins:
