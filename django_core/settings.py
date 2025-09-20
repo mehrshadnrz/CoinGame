@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "corsheaders",
     # Local Apps
     "config",
+    "crypto",
     "tokens",
     "user",
     "post",

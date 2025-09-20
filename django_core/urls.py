@@ -10,6 +10,7 @@ urlpatterns = [
     path("auth/", include("user.urls")),
     path("api/", include("post.urls")),
     path("api/", include("advertisement.urls")),
+    path("api/", include("crypto.urls")),
     # SWAGGER
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
