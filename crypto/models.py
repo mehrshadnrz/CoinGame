@@ -32,6 +32,7 @@ class CryptoCoins(models.Model):
     name = models.CharField(max_length=50)
     symbol = models.CharField(max_length=10)
     price = models.DecimalField(max_digits=20, decimal_places=2)
+
     percent_change_1h = models.DecimalField(
         max_digits=6, decimal_places=2, help_text="Change in %"
     )
@@ -41,11 +42,15 @@ class CryptoCoins(models.Model):
     percent_change_7d = models.DecimalField(
         max_digits=6, decimal_places=2, help_text="Change in %"
     )
+
     market_cap = models.CharField(max_length=20)
     volume_24h = models.CharField(max_length=20)
     circulating_supply = models.CharField(max_length=30)
+
+    sparkline_in_7d = models.JSONField(null=True, blank=True)
+
     promoted = models.BooleanField(default=False)
-    security_badge = models.BooleanField(default=False)
+    security_badge = models.BooleanField(default=True)
 
     category = models.ForeignKey(
         Category,
@@ -54,6 +59,8 @@ class CryptoCoins(models.Model):
         null=True,
         blank=True,
     )
+
+    last_updated = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["rank"]

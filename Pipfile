@@ -10,6 +10,7 @@ django-allauth = "==65.10.0"
 pillow = "*"
 drf-spectacular = "*"
 django-cors-headers = "*"
+coingecko-sdk = "*"
 
 [dev-packages]
 
