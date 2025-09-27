@@ -1,9 +1,10 @@
-from rest_framework import generics, permissions
-from rest_framework.authtoken.views import ObtainAuthToken
+from django.contrib.auth import authenticate, get_user_model
+from rest_framework import generics, permissions, status
 from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.contrib.auth import authenticate, get_user_model
+
 from user.serializers import UserSignupSerializer
 
 User = get_user_model()
@@ -12,6 +13,20 @@ class SignupView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSignupSerializer
     permission_classes = [permissions.AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        token, _ = Token.objects.get_or_create(user=user)
+
+        return Response({
+            "token": token.key,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+        }, status=status.HTTP_201_CREATED)
 
 class CustomLoginView(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
@@ -34,3 +49,16 @@ class LogoutView(APIView):
     def post(self, request):
         request.user.auth_token.delete()
         return Response({"detail": "Logged out successfully"})
+
+class MeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({
+            "token": token.key,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+        })

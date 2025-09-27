@@ -15,7 +15,7 @@ client = Coingecko(
 def update_market_coins():
     data = client.coins.markets.get(
         vs_currency="usd",
-        order="market_cap_desc",
+        order="rank",
         sparkline=True,
         price_change_percentage="1h,24h,7d",
     )
