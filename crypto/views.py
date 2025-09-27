@@ -19,43 +19,6 @@ class MarketStatisticsView(generics.RetrieveAPIView):
         return MarketStatistics.objects.first()
 
 
-# class CryptoCoinListView(APIView):
-#     """
-#     POST endpoint:
-#     {
-#         "category": 1   # optional
-#     }
-#     Response includes paginated coins + categories
-#     """
-
-#     def post(self, request, *args, **kwargs):
-#         category_id = request.data.get("category")
-
-#         queryset = CryptoCoins.objects.all()
-#         if category_id:
-#             queryset = queryset.filter(category_id=category_id)
-
-#         paginator = PageNumberPagination()
-#         paginator.page_size = 50
-#         page = paginator.paginate_queryset(queryset, request)
-#         coins_serializer = CryptoCoinSerializer(page, many=True)
-
-#         categories = Category.objects.all()
-#         categories_serializer = CategorySerializer(categories, many=True)
-
-#         return Response(
-#             {
-#                 "categories": categories_serializer.data,
-#                 "coins": {
-#                     "count": paginator.page.paginator.count,
-#                     "next": paginator.get_next_link(),
-#                     "previous": paginator.get_previous_link(),
-#                     "results": coins_serializer.data,
-#                 },
-#             }
-#         )
-
-
 class CryptoCoinListView(APIView):
     """
     POST endpoint:
@@ -71,7 +34,7 @@ class CryptoCoinListView(APIView):
         category_id = request.data.get("category")
         page = int(request.data.get("page", 1))
 
-        queryset = CryptoCoins.objects.all()
+        queryset = CryptoCoins.objects.all().order_by("rank")
         if category_id:
             queryset = queryset.filter(category_id=category_id)
 
