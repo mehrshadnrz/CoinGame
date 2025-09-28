@@ -275,7 +275,7 @@ def fetch_geckoterminal_coin_detail(chain: str, token_address: str):
 
     if info_resp.status_code == 200:
         info_data = info_resp.json().get("data", {}).get("attributes", {})
-        if info_data["coingecko_coin_id"] is not None:
+        if info_data["coingecko_coin_id"]:
             detail = fetch_coin_detail(info_data["coingecko_coin_id"])
             if detail and hasattr(detail, "to_dict"):
                 return detail.to_dict()
