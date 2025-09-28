@@ -186,61 +186,34 @@ def update_geckoterminal_token(chain: str, token_address: str):
     return coin
 
 
-def import_coin(user, symbol=None, chain=None, pool_address=None):
-    """Import coin and log request in CoinImportRequest."""
-    request_log = None
-    coin = None
-
+def import_coin(
+    user,
+    symbol,
+    category="Top",
+):
     try:
-        if symbol:
-            source = "coingecko"
-            symbol = symbol.upper()
-            coin = CryptoCoin.objects.filter(symbol=symbol).first()
+        symbol = symbol.upper()
+        coin = CryptoCoin.objects.filter(symbol=symbol).first()
 
-            if not coin:
-                data = fetch_top_coin_by_symbol(symbol)
-                if not data:
-                    raise ValueError("Coin not found in CoinGecko")
+        if not coin:
+            data = fetch_top_coin_by_symbol(symbol=symbol, category_name=category)
+            if not data:
+                raise ValueError("Coin not found in CoinGecko")
 
-                coin = CryptoCoin.objects.create(
-                    name=data["name"],
-                    symbol=data["symbol"],
-                    price=data["price"],
-                    market_cap=data["market_cap"],
-                    volume_24h=data["volume_24h"],
-                    percent_change_1h=data["percent_change_1h"],
-                    percent_change_24h=data["percent_change_24h"],
-                    percent_change_7d=data["percent_change_7d"],
-                )
-
-        elif chain and pool_address:
-            source = "geckoterminal"
-            coin = CryptoCoin.objects.filter(symbol__iexact=pool_address[:6]).first()
-
-            if not coin:
-                data = fetch_geckoterminal_token(chain, pool_address)
-                if not data:
-                    raise ValueError("Token not found in GeckoTerminal")
-
-                coin = CryptoCoin.objects.create(
-                    name=data["name"],
-                    symbol=data["symbol"],
-                    price=data["price"],
-                    market_cap=data["market_cap"],
-                    volume_24h=data["volume_24h"],
-                    percent_change_1h=data["percent_change_1h"],
-                    percent_change_24h=data["percent_change_24h"],
-                    percent_change_7d=data["percent_change_7d"],
-                )
-        else:
-            raise ValueError("Invalid parameters")
+            coin = CryptoCoin.objects.create(
+                name=data["name"],
+                symbol=data["symbol"],
+                price=data["price"],
+                market_cap=data["market_cap"],
+                volume_24h=data["volume_24h"],
+                percent_change_1h=data["percent_change_1h"],
+                percent_change_24h=data["percent_change_24h"],
+                percent_change_7d=data["percent_change_7d"],
+            )
 
         request_log = CoinImportRequest.objects.create(
             user=user,
-            source=source,
             symbol=symbol,
-            chain=chain,
-            pool_address=pool_address,
             created_coin=coin,
             status="success",
         )
@@ -248,10 +221,7 @@ def import_coin(user, symbol=None, chain=None, pool_address=None):
     except Exception as e:
         request_log = CoinImportRequest.objects.create(
             user=user,
-            source="coingecko" if symbol else "geckoterminal",
             symbol=symbol,
-            chain=chain,
-            pool_address=pool_address,
             created_coin=None,
             status="failed",
         )

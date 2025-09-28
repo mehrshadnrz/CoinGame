@@ -74,15 +74,9 @@ class CryptoCoin(models.Model):
 
 
 class CoinImportRequest(models.Model):
-    SOURCE_CHOICES = [
-        ("coingecko", "CoinGecko"),
-        ("geckoterminal", "GeckoTerminal"),
-    ]
-
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="coin_imports"
     )
-    source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
     symbol = models.CharField(max_length=50, null=True, blank=True)
     chain = models.CharField(max_length=20, null=True, blank=True)
     pool_address = models.CharField(max_length=100, null=True, blank=True)

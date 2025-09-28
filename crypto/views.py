@@ -101,21 +101,17 @@ class CoinImportView(APIView):
     {
         "symbol": "BTC"
     }
-    or
-    {
-        "chain": "eth",
-        "pool_address": "0x123..."
-    }
     """
 
     def post(self, request):
         user = request.user
         symbol = request.data.get("symbol")
-        chain = request.data.get("chain")
-        pool_address = request.data.get("pool_address")
+        category = request.data.get("category")
 
         coin, log = import_coin(
-            user, symbol=symbol, chain=chain, pool_address=pool_address
+            user,
+            symbol=symbol,
+            category=category,
         )
 
         if not coin:
