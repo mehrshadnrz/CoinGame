@@ -28,9 +28,9 @@ class Category(models.Model):
 
 
 class CryptoCoins(models.Model):
-    rank = models.PositiveIntegerField()
+    rank = models.PositiveIntegerField(null=True, blank=True)
     name = models.CharField(max_length=50)
-    symbol = models.CharField(max_length=10)
+    symbol = models.CharField(max_length=32)
     price = models.DecimalField(max_digits=20, decimal_places=2)
 
     percent_change_1h = models.DecimalField(

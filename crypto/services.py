@@ -9,8 +9,8 @@ client = Coingecko(
 )
 
 
-def update_market_coins(symbol: str):
-    category, _ = Category.objects.get_or_create(name="Top")
+def update_market_coin(symbol: str, category_name: str):
+    category, _ = Category.objects.get_or_create(name=category_name)
     coin = client.coins.markets.get(
         vs_currency="usd",
         order="rank",
