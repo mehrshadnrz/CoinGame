@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import MarketStatistics, Category, CryptoCoins
+from .models import MarketStatistics, Category, CryptoCoin
 
 
 @admin.register(MarketStatistics)
@@ -26,8 +26,8 @@ class CategoryAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
-@admin.register(CryptoCoins)
-class CryptoCoinsAdmin(admin.ModelAdmin):
+@admin.register(CryptoCoin)
+class CryptoCoinAdmin(admin.ModelAdmin):
     list_display = (
         "rank",
         "name",

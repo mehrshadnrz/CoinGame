@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Category, CryptoCoins, MarketStatistics
+from .models import Category, CryptoCoin, MarketStatistics
 
 
 class MarketStatisticsSerializer(serializers.ModelSerializer):
@@ -22,7 +22,7 @@ class CryptoCoinSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = CryptoCoins
+        model = CryptoCoin
         fields = "__all__"
 
 
@@ -37,6 +37,7 @@ class CoinDetailSerializer(serializers.Serializer):
     tickers = serializers.ListField(child=serializers.DictField(), required=False)
     community_data = serializers.DictField(required=False)
     developer_data = serializers.DictField(required=False)
-    sparkline_in_7d = serializers.DictField(child=serializers.ListField(child=serializers.FloatField()), required=False)
+    sparkline_in_7d = serializers.DictField(
+        child=serializers.ListField(child=serializers.FloatField()), required=False
+    )
     last_updated = serializers.DateTimeField()
-

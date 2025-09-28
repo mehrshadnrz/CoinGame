@@ -3,14 +3,19 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Category, CryptoCoins, MarketStatistics
+from .models import (
+    Category,
+    CoinImportRequest,
+    CryptoCoin,
+    MarketStatistics,
+)
 from .serializers import (
     CategorySerializer,
     CoinDetailSerializer,
     CryptoCoinSerializer,
     MarketStatisticsSerializer,
 )
-from .services import fetch_coin_detail
+from .services import fetch_coin_detail, fetch_geckoterminal_coin_detail, import_coin
 
 
 class MarketStatisticsView(generics.RetrieveAPIView):
@@ -36,7 +41,7 @@ class CryptoCoinListView(APIView):
         category_id = request.data.get("category")
         page = int(request.data.get("page", 1))
 
-        queryset = CryptoCoins.objects.all().order_by("rank")
+        queryset = CryptoCoin.objects.all().order_by("rank")
         if category_id:
             queryset = queryset.filter(category_id=category_id)
 
@@ -67,23 +72,18 @@ class CryptoCoinListView(APIView):
 
 
 class CoinDetailView(APIView):
-    """
-    GET /api/coins/detail/<int:pk>/
-
-    Example:
-      /api/coins/detail/1/
-    """
-
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, pk, *args, **kwargs):
-        # Step 1: Find coin in DB
-        coin_obj = get_object_or_404(CryptoCoins, pk=pk)
+        coin_obj = get_object_or_404(CryptoCoin, pk=pk)
 
-        # Step 2: Request detail from CoinGecko (using name/id, not DB id)
-        # CoinGecko ids are lowercase and hyphenated (e.g., 'bitcoin', 'ethereum')
-        coin_id = coin_obj.name.lower().replace(" ", "-")
-        detail = fetch_coin_detail(coin_id)
+        if ":" in coin_obj.coingecko_id:  # means GeckoTerminal coin (chain:address)
+            chain, token_address = coin_obj.coingecko_id.split(":", 1)
+            detail = fetch_geckoterminal_coin_detail(chain, token_address)
+        else:  # CoinGecko coin
+            detail = fetch_coin_detail(coin_obj.coingecko_id)
+            if detail and hasattr(detail, "to_dict"):
+                detail = detail.to_dict()
 
         if not detail:
             return Response(
@@ -91,9 +91,47 @@ class CoinDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Step 3: Serialize response
-        detail_dict = (
-            detail.to_dict() if hasattr(detail, "to_dict") else detail.__dict__
-        )
-        serializer = CoinDetailSerializer(detail_dict)
+        serializer = CoinDetailSerializer(detail)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class CoinImportView(APIView):
+    """
+    POST /import-coin/
+    {
+        "symbol": "BTC"
+    }
+    or
+    {
+        "chain": "eth",
+        "pool_address": "0x123..."
+    }
+    """
+
+    def post(self, request):
+        user = request.user
+        symbol = request.data.get("symbol")
+        chain = request.data.get("chain")
+        pool_address = request.data.get("pool_address")
+
+        coin, log = import_coin(
+            user, symbol=symbol, chain=chain, pool_address=pool_address
+        )
+
+        if not coin:
+            return Response(
+                {
+                    "error": "Coin not found",
+                    "request_id": log.id if log else None,
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "coin": CryptoCoinSerializer(coin).data,
+                "import_request_id": log.id,
+                "status": log.status,
+            },
+            status=status.HTTP_201_CREATED,
+        )

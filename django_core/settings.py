@@ -161,3 +161,4 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 COINGECKO_DEMO_API_KEY = "CG-b5UWE4ZrZEP3wTpLwbGh1tiW"
+GECKOTERMINAL_BASE = "https://api.geckoterminal.com/api/v2"

@@ -11,12 +11,12 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AlterField(
-            model_name='cryptocoins',
+            model_name='CryptoCoins',
             name='rank',
             field=models.PositiveIntegerField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='cryptocoins',
+            model_name='CryptoCoins',
             name='symbol',
             field=models.CharField(max_length=32),
         ),

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -27,7 +28,10 @@ class Category(models.Model):
         return self.name
 
 
-class CryptoCoins(models.Model):
+class CryptoCoin(models.Model):
+    coingecko_id = models.CharField(
+        max_length=100, unique=True, help_text="CoinGecko API ID (e.g. 'bitcoin')"
+    )
     rank = models.PositiveIntegerField(null=True, blank=True)
     name = models.CharField(max_length=50)
     symbol = models.CharField(max_length=32)
@@ -67,3 +71,42 @@ class CryptoCoins(models.Model):
 
     def __str__(self):
         return f"{self.rank}. {self.name} ({self.symbol})"
+
+
+class CoinImportRequest(models.Model):
+    SOURCE_CHOICES = [
+        ("coingecko", "CoinGecko"),
+        ("geckoterminal", "GeckoTerminal"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="coin_imports"
+    )
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
+    symbol = models.CharField(max_length=50, null=True, blank=True)
+    chain = models.CharField(max_length=20, null=True, blank=True)
+    pool_address = models.CharField(max_length=100, null=True, blank=True)
+
+    created_coin = models.ForeignKey(
+        CryptoCoin,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="import_requests",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("success", "Success"),
+            ("failed", "Failed"),
+        ],
+        default="failed",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return (
+            f"{self.user} imported {self.symbol or self.pool_address} ({self.source})"
+        )
