@@ -20,7 +20,7 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
     serializer_class = AdvertisementSerializer
 
     def get_queryset(self):
-        qs = Advertisement.objects.filter(display_ad=True).order_by("-created_at")
+        qs = Advertisement.objects.all().order_by("-created_at")
         if self.action == "list" and not self.request.user.is_staff:
             qs = qs.filter(user=self.request.user)
         return qs
@@ -127,3 +127,17 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
         ad.display_ad = bool(display_ad)
         ad.save()
         return Response({"id": ad.id, "display_ad": ad.display_ad})
+
+
+    @extend_schema(
+        description="Get the currently active advertisement(s) for display on the site.",
+        responses={
+            200: AdvertisementSerializer(many=True),
+        },
+    )
+    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
+    def active(self, request):
+        """Return currently active ads (display_ad=True)"""
+        ads = Advertisement.objects.filter(display_ad=True).order_by("-created_at")
+        serializer = self.get_serializer(ads, many=True)
+        return Response(serializer.data)
