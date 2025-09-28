@@ -28,7 +28,7 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == "create":
             return [permissions.IsAuthenticated()]
-        if self.action in ["list", "retrieve"]:
+        if self.action in ["list", "retrieve", "active"]:
             return [permissions.AllowAny()]
         return [permissions.IsAdminUser()]
 
