@@ -29,9 +29,7 @@ class Category(models.Model):
 
 
 class CryptoCoin(models.Model):
-    coingecko_id = models.CharField(
-        max_length=100, unique=True, help_text="CoinGecko API ID (e.g. 'bitcoin')"
-    )
+    coingecko_id = models.CharField(max_length=100)
     rank = models.PositiveIntegerField(null=True, blank=True)
     name = models.CharField(max_length=50)
     symbol = models.CharField(max_length=32)

@@ -5,7 +5,6 @@ from rest_framework.views import APIView
 
 from .models import (
     Category,
-    CoinImportRequest,
     CryptoCoin,
     MarketStatistics,
 )
@@ -15,7 +14,7 @@ from .serializers import (
     CryptoCoinSerializer,
     MarketStatisticsSerializer,
 )
-from .services import fetch_coin_detail, fetch_geckoterminal_coin_detail, import_coin
+from .services import fetch_coin_detail, import_coin
 
 
 class MarketStatisticsView(generics.RetrieveAPIView):
@@ -77,13 +76,9 @@ class CoinDetailView(APIView):
     def get(self, request, pk, *args, **kwargs):
         coin_obj = get_object_or_404(CryptoCoin, pk=pk)
 
-        if ":" in coin_obj.coingecko_id:  # means GeckoTerminal coin (chain:address)
-            chain, token_address = coin_obj.coingecko_id.split(":", 1)
-            detail = fetch_geckoterminal_coin_detail(chain, token_address)
-        else:  # CoinGecko coin
-            detail = fetch_coin_detail(coin_obj.coingecko_id)
-            if detail and hasattr(detail, "to_dict"):
-                detail = detail.to_dict()
+        detail = fetch_coin_detail(coin_obj.coingecko_id)
+        if detail and hasattr(detail, "to_dict"):
+            detail = detail.to_dict()
 
         if not detail:
             return Response(

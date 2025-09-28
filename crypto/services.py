@@ -115,77 +115,6 @@ def fetch_coin_detail(coin_id: str):
     )
 
 
-def fetch_geckoterminal_token(
-    chain: str, token_address: str, category_name: str = "Gaming"
-):
-    """
-    Fetch a token from GeckoTerminal by chain and contract address.
-    Normalizes into CryptoCoin model structure.
-    """
-    category, _ = Category.objects.get_or_create(name=category_name)
-    url = f"{GECKOTERMINAL_BASE_URL}/networks/{chain}/tokens/{token_address}"
-    response = requests.get(url)
-    if response.status_code != 200:
-        logger.warning(
-            f"Failed to fetch token {token_address} on {chain}: {response.text}"
-        )
-        return None
-
-    data = response.json().get("data")
-    if not data:
-        return None
-
-    attributes = data.get("attributes", {})
-
-    # Normalize to match CryptoCoin fields
-    return {
-        "coingecko_id": f"{chain}:{token_address}",  # unique identifier
-        "rank": None,  # no ranking in GeckoTerminal
-        "name": attributes.get("name"),
-        "symbol": attributes.get("symbol"),
-        "price": attributes.get("price_usd") or 0,
-        "percent_change_1h": attributes.get("price_change_percentage", {}).get("m5")
-        or 0,
-        "percent_change_24h": attributes.get("price_change_percentage", {}).get("h24")
-        or 0,
-        "percent_change_7d": attributes.get("price_change_percentage", {}).get("d7")
-        or 0,
-        "market_cap": attributes.get("market_cap_usd") or "0",
-        "volume_24h": attributes.get("volume_usd", {}).get("h24") or "0",
-        "circulating_supply": attributes.get("circulating_supply") or "N/A",
-        "sparkline_in_7d": None,  # GeckoTerminal does not provide sparkline
-        "category": category,
-    }
-
-
-def update_geckoterminal_token(chain: str, token_address: str):
-    """
-    Store/update a GeckoTerminal token in CryptoCoin table.
-    """
-    token = fetch_geckoterminal_token(chain, token_address)
-    if not token:
-        return None
-
-    coin, _ = CryptoCoin.objects.update_or_create(
-        coingecko_id=token["coingecko_id"],
-        defaults={
-            "rank": token["rank"],
-            "name": token["name"],
-            "symbol": token["symbol"].upper(),
-            "price": token["price"],
-            "percent_change_1h": token["percent_change_1h"],
-            "percent_change_24h": token["percent_change_24h"],
-            "percent_change_7d": token["percent_change_7d"],
-            "market_cap": str(token["market_cap"]),
-            "volume_24h": str(token["volume_24h"]),
-            "circulating_supply": str(token["circulating_supply"]),
-            "sparkline_in_7d": token["sparkline_in_7d"],
-            "category": token["category"],
-        },
-    )
-    return coin
-
-
 def import_coin(
     user,
     symbol,
@@ -200,7 +129,11 @@ def import_coin(
             if not data:
                 raise ValueError("Coin not found in CoinGecko")
 
+            print(data, "\n\n\n\n")
+
             coin = CryptoCoin.objects.create(
+                coingecko_id=data["coingecko_id"],
+                rank=data["rank"],
                 name=data["name"],
                 symbol=data["symbol"],
                 price=data["price"],
@@ -209,6 +142,9 @@ def import_coin(
                 percent_change_1h=data["percent_change_1h"],
                 percent_change_24h=data["percent_change_24h"],
                 percent_change_7d=data["percent_change_7d"],
+                sparkline_in_7d=data["sparkline_in_7d"],
+                circulating_supply=data["circulating_supply"],
+                category=data["category"]
             )
 
         request_log = CoinImportRequest.objects.create(
@@ -228,62 +164,3 @@ def import_coin(
         print("Import failed:", e)
 
     return coin, request_log
-
-
-def fetch_geckoterminal_coin_detail(chain: str, token_address: str):
-    """
-    Fetch detailed token info from GeckoTerminal using both
-    `/tokens/{address}` and `/tokens/{address}/info`.
-    Normalizes into CoinDetailSerializer schema.
-    """
-    # Base attributes
-    base_url = f"{GECKOTERMINAL_BASE_URL}/networks/{chain}/tokens/{token_address}"
-    info_url = f"{base_url}/info"
-
-    info_resp = requests.get(info_url)
-    info_data = {}
-
-    if info_resp.status_code == 200:
-        info_data = info_resp.json().get("data", {}).get("attributes", {})
-
-    base_resp = requests.get(base_url)
-    if base_resp.status_code != 200:
-        return None
-
-    base_data = base_resp.json().get("data", {})
-    attributes = base_data.get("attributes", {})
-
-    return {
-        "id": f"{chain}:{token_address}",
-        "symbol": attributes.get("symbol"),
-        "name": attributes.get("name"),
-        "image": {"large": info_data.get("image_url") or attributes.get("image_url")},
-        "description": {"en": info_data.get("description", "")},
-        "links": {
-            "homepage": [info_data.get("website")] if info_data.get("website") else [],
-            "discord": info_data.get("discord_url"),
-            "telegram": info_data.get("telegram_url"),
-            "twitter": f"https://twitter.com/{info_data.get('twitter_handle')}"
-            if info_data.get("twitter_handle")
-            else None,
-        },
-        "market_data": {
-            "current_price": {"usd": attributes.get("price_usd")},
-            "market_cap": {"usd": attributes.get("market_cap_usd")},
-            "total_volume": {"usd": attributes.get("volume_usd", {}).get("h24")},
-            "price_change_percentage_1h_in_currency": {
-                "usd": attributes.get("price_change_percentage", {}).get("m5")
-            },
-            "price_change_percentage_24h_in_currency": {
-                "usd": attributes.get("price_change_percentage", {}).get("h24")
-            },
-            "price_change_percentage_7d_in_currency": {
-                "usd": attributes.get("price_change_percentage", {}).get("d7")
-            },
-        },
-        "tickers": [],
-        "community_data": {},
-        "developer_data": {},
-        "sparkline_in_7d": {"price": []},
-        "last_updated": attributes.get("updated_at") or info_data.get("updated_at"),
-    }
