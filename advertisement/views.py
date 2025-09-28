@@ -20,7 +20,7 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
     serializer_class = AdvertisementSerializer
 
     def get_queryset(self):
-        qs = Advertisement.objects.all().order_by("-created_at")
+        qs = Advertisement.objects.filter(display_ad=True).order_by("-created_at")
         if self.action == "list" and not self.request.user.is_staff:
             qs = qs.filter(user=self.request.user)
         return qs
