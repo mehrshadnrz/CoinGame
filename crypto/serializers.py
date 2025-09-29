@@ -1,6 +1,14 @@
+from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Category, CryptoCoin, MarketStatistics
+from .models import (
+    Category,
+    CoinRating,
+    CoinVote,
+    CoinWishlist,
+    CryptoCoin,
+    MarketStatistics,
+)
 
 
 class MarketStatisticsSerializer(serializers.ModelSerializer):
@@ -41,3 +49,56 @@ class CoinDetailSerializer(serializers.Serializer):
         child=serializers.ListField(child=serializers.FloatField()), required=False
     )
     last_updated = serializers.DateTimeField()
+
+
+class CoinVoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoinVote
+        fields = ["id", "coin", "vote", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+    def validate(self, data):
+        user = self.context["request"].user
+        coin = data["coin"]
+        today = timezone.now().date()
+
+        if CoinVote.objects.filter(
+            user=user, coin=coin, created_at__date=today
+        ).exists():
+            raise serializers.ValidationError(
+                "You have already voted today for this coin."
+            )
+        return data
+
+
+class CoinRatingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoinRating
+        fields = ["id", "coin", "stars", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate_stars(self, value):
+        if value < 1 or value > 5:
+            raise serializers.ValidationError("Stars must be between 1 and 5.")
+        return value
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        coin = validated_data["coin"]
+
+        # If rating exists, update instead of creating a new one
+        rating, created = CoinRating.objects.update_or_create(
+            user=user,
+            coin=coin,
+            defaults={"stars": validated_data["stars"]},
+        )
+        return rating
+
+
+class CoinWishlistSerializer(serializers.ModelSerializer):
+    coin_detail = serializers.StringRelatedField(source="coin", read_only=True)
+
+    class Meta:
+        model = CoinWishlist
+        fields = ["id", "coin", "coin_detail", "created_at"]
+        read_only_fields = ["id", "created_at", "coin_detail"]

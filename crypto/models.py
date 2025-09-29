@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class MarketStatistics(models.Model):
@@ -102,3 +103,72 @@ class CoinImportRequest(models.Model):
         return (
             f"{self.user} imported {self.symbol or self.pool_address} ({self.source})"
         )
+
+
+class CoinVote(models.Model):
+    VOTE_CHOICES = [
+        ("bullish", "Bullish"),
+        ("bearish", "Bearish"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="coin_votes"
+    )
+    coin = models.ForeignKey(CryptoCoin, on_delete=models.CASCADE, related_name="votes")
+    vote = models.CharField(max_length=10, choices=VOTE_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "coin", "created_at")
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        # Enforce only one vote per day per user per coin
+        today = timezone.now().date()
+        if CoinVote.objects.filter(
+            user=self.user, coin=self.coin, created_at__date=today
+        ).exists():
+            raise ValueError("You can only vote once per day for this coin.")
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return (
+            f"{self.user} voted {self.vote} on {self.coin} ({self.created_at.date()})"
+        )
+
+
+class CoinRating(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="coin_ratings"
+    )
+    coin = models.ForeignKey(
+        CryptoCoin, on_delete=models.CASCADE, related_name="ratings"
+    )
+    stars = models.PositiveSmallIntegerField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "coin")  # only one rating per user per coin
+
+    def __str__(self):
+        return f"{self.user} rated {self.coin} {self.stars}⭐"
+
+
+class CoinWishlist(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="coin_wishlist"
+    )
+    coin = models.ForeignKey(
+        CryptoCoin, on_delete=models.CASCADE, related_name="wishlisted_by"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "coin")  # prevent duplicates
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} wishlisted {self.coin}"
+

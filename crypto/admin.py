@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import MarketStatistics, Category, CryptoCoin
+from .models import (
+    MarketStatistics,
+    Category,
+    CryptoCoin,
+    CoinImportRequest,
+    CoinVote,
+    CoinRating,
+    CoinWishlist,
+)
 
 
 @admin.register(MarketStatistics)
@@ -12,8 +20,16 @@ class MarketStatisticsAdmin(admin.ModelAdmin):
         "dominance",
         "fear_and_greed",
     )
-    readonly_fields = ("cryptos", "exchanges", "market_cap", "market_cap_percent",
-                       "vol_24h", "vol_24h_percent", "dominance", "fear_and_greed")
+    readonly_fields = (
+        "cryptos",
+        "exchanges",
+        "market_cap",
+        "market_cap_percent",
+        "vol_24h",
+        "vol_24h_percent",
+        "dominance",
+        "fear_and_greed",
+    )
 
     def has_add_permission(self, request):
         """Prevent multiple MarketStatistics entries"""
@@ -48,13 +64,32 @@ class CryptoCoinAdmin(admin.ModelAdmin):
     readonly_fields = ("last_updated", "sparkline_in_7d")
 
     fieldsets = (
-        (None, {
-            "fields": (
-                "rank", "name", "symbol", "price",
-                "percent_change_1h", "percent_change_24h", "percent_change_7d",
-                "market_cap", "volume_24h", "circulating_supply",
-                "category", "promoted", "security_badge",
-                "last_updated", "sparkline_in_7d",
-            )
-        }),
+        (
+            None,
+            {
+                "fields": (
+                    "rank",
+                    "name",
+                    "symbol",
+                    "price",
+                    "percent_change_1h",
+                    "percent_change_24h",
+                    "percent_change_7d",
+                    "market_cap",
+                    "volume_24h",
+                    "circulating_supply",
+                    "category",
+                    "promoted",
+                    "security_badge",
+                    "last_updated",
+                    "sparkline_in_7d",
+                )
+            },
+        ),
     )
+
+
+admin.site.register(CoinImportRequest)
+admin.site.register(CoinVote)
+admin.site.register(CoinRating)
+admin.site.register(CoinWishlist)

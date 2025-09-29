@@ -1,16 +1,17 @@
+from django.db import models
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import (
-    Category,
-    CryptoCoin,
-    MarketStatistics,
-)
+from .models import Category, CoinWishlist, CryptoCoin, MarketStatistics
 from .serializers import (
     CategorySerializer,
     CoinDetailSerializer,
+    CoinRatingSerializer,
+    CoinVoteSerializer,
+    CoinWishlistSerializer,
     CryptoCoinSerializer,
     MarketStatisticsSerializer,
 )
@@ -126,3 +127,92 @@ class CoinImportView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class CryptoCoinViewSet(viewsets.ModelViewSet):
+    queryset = CryptoCoin.objects.all()
+    serializer_class = CryptoCoinSerializer
+
+    @action(
+        detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated]
+    )
+    def vote(self, request, pk=None):
+        coin = self.get_object()
+        serializer = CoinVoteSerializer(
+            data={**request.data, "coin": coin.id},
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(user=request.user, coin=coin)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"], permission_classes=[permissions.AllowAny])
+    def vote_stats(self, request, pk=None):
+        coin = self.get_object()
+        bullish_count = coin.votes.filter(vote="bullish").count()
+        bearish_count = coin.votes.filter(vote="bearish").count()
+        return Response({"bullish": bullish_count, "bearish": bearish_count})
+
+    @action(
+        detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated]
+    )
+    def rate(self, request, pk=None):
+        coin = self.get_object()
+        serializer = CoinRatingSerializer(
+            data={**request.data, "coin": coin.id},
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        rating = serializer.save(user=request.user, coin=coin)
+        return Response(
+            CoinRatingSerializer(rating).data, status=status.HTTP_201_CREATED
+        )
+
+    @action(detail=True, methods=["get"], permission_classes=[permissions.AllowAny])
+    def rating_stats(self, request, pk=None):
+        coin = self.get_object()
+        ratings = coin.ratings.all()
+        count = ratings.count()
+        avg = ratings.aggregate(models.Avg("stars"))["stars__avg"] or 0
+        return Response({"average": round(avg, 2), "count": count})
+
+
+class UserWishListViewSet(viewsets.ModelViewSet):
+    queryset = CryptoCoin.objects.all()
+    serializer_class = CryptoCoinSerializer
+
+    @action(
+        detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated]
+    )
+    def add_to_wishlist(self, request, pk=None):
+        coin = self.get_object()
+        wishlist, created = CoinWishlist.objects.get_or_create(
+            user=request.user, coin=coin
+        )
+        if not created:
+            return Response(
+                {"detail": "Already in wishlist."}, status=status.HTTP_200_OK
+            )
+        return Response(
+            CoinWishlistSerializer(wishlist).data, status=status.HTTP_201_CREATED
+        )
+
+    @action(
+        detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated]
+    )
+    def remove_from_wishlist(self, request, pk=None):
+        coin = self.get_object()
+        deleted, _ = CoinWishlist.objects.filter(user=request.user, coin=coin).delete()
+        if deleted:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            {"detail": "Not in wishlist."}, status=status.HTTP_400_BAD_REQUEST
+        )
+
+    @action(
+        detail=False, methods=["get"], permission_classes=[permissions.IsAuthenticated]
+    )
+    def my_wishlist(self, request):
+        wishlist = CoinWishlist.objects.filter(user=request.user).select_related("coin")
+        serializer = CoinWishlistSerializer(wishlist, many=True)
+        return Response(serializer.data)
