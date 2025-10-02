@@ -42,6 +42,13 @@ class Post(models.Model):
         help_text="Minute",
     )
 
+    coins = models.ManyToManyField(
+        "CryptoCoin",
+        related_name="posts",
+        blank=True,
+        help_text="Coins related to this post",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -45,6 +45,7 @@ class CategoryAdmin(admin.ModelAdmin):
 @admin.register(CryptoCoin)
 class CryptoCoinAdmin(admin.ModelAdmin):
     list_display = (
+        "id",
         "rank",
         "name",
         "symbol",

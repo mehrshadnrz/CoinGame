@@ -11,6 +11,9 @@ pillow = "*"
 drf-spectacular = "*"
 django-cors-headers = "*"
 coingecko-sdk = "*"
+web3 = "*"
+hexbytes = "*"
+eth-utils = "*"
 
 [dev-packages]
 

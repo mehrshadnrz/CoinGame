@@ -4,9 +4,10 @@ from django.conf import settings
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
+from crypto.models import CryptoCoin
 
 
-class AdvertisementPlan(models.Model):
+class TokenPromotionPlan(models.Model):
     name = models.CharField(
         max_length=50,
         unique=True,
@@ -31,72 +32,53 @@ class AdvertisementPlan(models.Model):
     def __str__(self):
         return f"{self.name} ({self.duration_in_months} months / ${self.cost})"
 
+    class Meta:
+        verbose_name = "Token Promotion Plan"
+        verbose_name_plural = "Token Promotion Plans"
 
-class Advertisement(models.Model):
+
+class TokenPromotionRequest(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         null=False,
         blank=False,
-        related_name="advertisements",
+        related_name="token_promotion_requests",
         verbose_name="User",
     )
     plan = models.ForeignKey(
-        AdvertisementPlan,
+        TokenPromotionPlan,
         on_delete=models.CASCADE,
-        related_name="ads",
+        related_name="token_promotion_requests",
         null=False,
         blank=False,
-        verbose_name=_("Advertisement Plan"),
+        verbose_name=_("Token Promotion Plan"),
     )
-    banner_image = models.ImageField(
-        upload_to="ads/banners/",
-        verbose_name=_("Banner Image"),
-        null=False,
-        blank=False,
-    )
-    wide_banner_image = models.ImageField(
-        upload_to="ads/wide_banners/",
-        verbose_name=_("Wide Banner Image"),
-        null=False,
-        blank=False,
-    )
-    banner_link = models.URLField(
-        blank=True,
-        null=True,
-        verbose_name=_("Banner Link"),
-    )
-    wide_banner_link = models.URLField(
-        blank=True,
-        null=True,
-        verbose_name=_("Wide Banner Link"),
-    )
-    description = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name=_("Description"),
-    )
-    has_payment = models.BooleanField(default=False, verbose_name=_("Has payment"))
-    display_ad = models.BooleanField(
-        default=False, verbose_name=_("Selected for Display")
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(blank=True, null=True, editable=False)
 
-    @property
-    def is_active(self):
-        return self.expires_at is None or self.expires_at > now()
+    coin = models.ForeignKey(
+        CryptoCoin,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="token_promotion_requests",
+        verbose_name="Top Token",
+    )
+
+    has_payment = models.BooleanField(default=False, verbose_name=_("Has payment"))
+    is_active = models.BooleanField(default=False)
+    expires_at = models.DateTimeField(blank=True, null=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Promotion Request({self.coin}) by {self.user}"
 
     def save(self, *args, **kwargs):
         if not self.expires_at and self.plan:
             self.expires_at = (self.created_at or now()) + timedelta(
                 days=30 * self.plan.duration_in_months
             )
-
-        if self.display_ad:
-            Advertisement.objects.exclude(pk=self.pk).update(display_ad=False)
-
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return f"Ad #{self.id} ({self.plan.name})"
+    class Meta:
+        verbose_name = "Token Promotion Request"
+        verbose_name_plural = "Token Promotion Requests"

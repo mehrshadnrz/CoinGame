@@ -50,10 +50,11 @@ INSTALLED_APPS = [
     # Local Apps
     "config",
     "crypto",
-    "tokens",
     "user",
     "post",
     "advertisement",
+    "payment",
+    "promotion",
 ]
 
 MIDDLEWARE = [
@@ -162,3 +163,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 COINGECKO_DEMO_API_KEY = "CG-b5UWE4ZrZEP3wTpLwbGh1tiW"
 GECKOTERMINAL_BASE = "https://api.geckoterminal.com/api/v2"
+
+BSC_RPC_URL = "https://bsc-dataseed.binance.org/"  # or QuickNode / Ankr endpoint
+PAYMENT_MERCHANT_ADDRESS = "0xYourMerchantAddressHere"
+PAYMENT_MIN_CONFIRMATIONS = 3

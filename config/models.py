@@ -2,6 +2,9 @@ from django.db import models
 
 
 class SiteConfig(models.Model):
+    payment_token_address = models.TextField(blank=True, null=True)
+    recipient_address = models.TextField(blank=True, null=True)
+
     about_us = models.TextField(blank=True, null=True)
     contact_email = models.EmailField(blank=True, null=True)
     contact_phone = models.CharField(max_length=50, blank=True, null=True)

@@ -172,3 +172,27 @@ class CoinWishlist(models.Model):
     def __str__(self):
         return f"{self.user} wishlisted {self.coin}"
 
+
+class CoinSecurityCheckRequest(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=False,
+        blank=False,
+        related_name="token_update_requests",
+        verbose_name="User",
+    )
+    coin = models.OneToOneField(
+        CryptoCoin,
+        on_delete=models.CASCADE,
+        related_name="token_update_request",
+        verbose_name="Coin",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"SecurityRequest({self.coin}) by {self.user}"
+
+    class Meta:
+        verbose_name = "Security Request"
+        verbose_name_plural = "Security Requests"

@@ -4,7 +4,7 @@ from advertisement.models import Advertisement, AdvertisementPlan
 
 @admin.register(AdvertisementPlan)
 class AdvertisementPlanAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "duration_in_months", "cost_usd", "created_at")
+    list_display = ("id", "name", "duration_in_months", "cost", "created_at")
     search_fields = ("name",)
     list_filter = ("duration_in_months",)
 

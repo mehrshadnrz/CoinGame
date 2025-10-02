@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Category, CoinWishlist, CryptoCoin, MarketStatistics
+from .models import Category, CoinWishlist, CryptoCoin, MarketStatistics, CoinSecurityCheckRequest
 from .serializers import (
     CategorySerializer,
     CoinDetailSerializer,
@@ -14,8 +14,10 @@ from .serializers import (
     CoinWishlistSerializer,
     CryptoCoinSerializer,
     MarketStatisticsSerializer,
+    CoinSecurityCheckRequestSerializer,
 )
 from .services import fetch_coin_detail, import_coin
+from post.serializers import PostSerializer
 
 
 class MarketStatisticsView(generics.RetrieveAPIView):
@@ -158,14 +160,25 @@ class CryptoCoinViewSet(viewsets.ModelViewSet):
     )
     def rate(self, request, pk=None):
         coin = self.get_object()
-        serializer = CoinRatingSerializer(
-            data={**request.data, "coin": coin.id},
-            context={"request": request},
-        )
+        user = request.user
+        rating_instance = coin.ratings.filter(user=user).first()
+        if rating_instance:
+            serializer = CoinRatingSerializer(
+                rating_instance,
+                data={**request.data, "coin": coin.id},
+                context={"request": request},
+                partial=True,
+            )
+        else:
+            serializer = CoinRatingSerializer(
+                data={**request.data, "coin": coin.id},
+                context={"request": request},
+            )
         serializer.is_valid(raise_exception=True)
-        rating = serializer.save(user=request.user, coin=coin)
+        rating = serializer.save(user=user, coin=coin)
         return Response(
-            CoinRatingSerializer(rating).data, status=status.HTTP_201_CREATED
+            CoinRatingSerializer(rating).data,
+            status=status.HTTP_200_OK if rating_instance else status.HTTP_201_CREATED,
         )
 
     @action(detail=True, methods=["get"], permission_classes=[permissions.AllowAny])
@@ -174,7 +187,19 @@ class CryptoCoinViewSet(viewsets.ModelViewSet):
         ratings = coin.ratings.all()
         count = ratings.count()
         avg = ratings.aggregate(models.Avg("stars"))["stars__avg"] or 0
-        return Response({"average": round(avg, 2), "count": count})
+        try:
+            my_rating = coin.ratings.get(user=request.user)
+        except Exception:
+            my_rating = None
+        return Response({"average": round(avg, 2), "count": count, "my_rating": my_rating})
+
+
+    @action(detail=True, methods=["get"], permission_classes=[permissions.AllowAny])
+    def related_posts(self, request, pk=None):
+        coin = self.get_object()
+        posts = coin.posts.all().order_by("-publish_at")
+        serializer = PostSerializer(posts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class UserWishListViewSet(viewsets.ModelViewSet):
@@ -216,3 +241,29 @@ class UserWishListViewSet(viewsets.ModelViewSet):
         wishlist = CoinWishlist.objects.filter(user=request.user).select_related("coin")
         serializer = CoinWishlistSerializer(wishlist, many=True)
         return Response(serializer.data)
+
+
+class TokenUpdateRequestViewSet(viewsets.ModelViewSet):
+    queryset = CoinSecurityCheckRequest.objects.all()
+    serializer_class = CoinSecurityCheckRequestSerializer
+
+    def get_permissions(self):
+        if self.action == "destroy":
+            return [permissions.IsAdminUser()]
+        return [permissions.IsAuthenticated()]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return CoinSecurityCheckRequest.objects.all()
+        return CoinSecurityCheckRequest.objects.filter(user=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(user=request.user)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )

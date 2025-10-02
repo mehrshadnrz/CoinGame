@@ -1,6 +1,5 @@
 import logging
 
-import requests
 from coingecko_sdk import Coingecko
 from django.conf import settings
 
@@ -144,7 +143,7 @@ def import_coin(
                 percent_change_7d=data["percent_change_7d"],
                 sparkline_in_7d=data["sparkline_in_7d"],
                 circulating_supply=data["circulating_supply"],
-                category=data["category"]
+                category=data["category"],
             )
 
         request_log = CoinImportRequest.objects.create(

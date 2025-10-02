@@ -8,6 +8,7 @@ from .models import (
     CoinWishlist,
     CryptoCoin,
     MarketStatistics,
+    CoinSecurityCheckRequest,
 )
 
 
@@ -102,3 +103,38 @@ class CoinWishlistSerializer(serializers.ModelSerializer):
         model = CoinWishlist
         fields = ["id", "coin", "coin_detail", "created_at"]
         read_only_fields = ["id", "created_at", "coin_detail"]
+
+class CoinSecurityCheckRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CoinSecurityCheckRequest
+        fields = [
+            "id",
+            "user",
+            "coin",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "user",
+            "created_at",
+        ]
+
+    def validate(self, data):
+        coin = data.get("coin")
+
+        if CoinSecurityCheckRequest.objects.filter(coin=coin).exists():
+            raise serializers.ValidationError(
+                {"error": "An update request for this coin already exists."}
+            )
+        return data
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        validated_data["user"] = user
+        instance = super().create(validated_data)
+
+        coin = instance.coin
+        coin.security_badge = False
+        coin.save()
+
+        return instance
