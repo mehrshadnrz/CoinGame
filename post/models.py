@@ -1,4 +1,5 @@
 from django.db import models
+from crypto.models import CryptoCoin
 
 
 class Status(models.TextChoices):
@@ -43,7 +44,7 @@ class Post(models.Model):
     )
 
     coins = models.ManyToManyField(
-        "CryptoCoin",
+        CryptoCoin,
         related_name="posts",
         blank=True,
         help_text="Coins related to this post",
