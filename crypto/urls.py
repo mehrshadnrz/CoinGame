@@ -8,11 +8,13 @@ from .views import (
     CryptoCoinViewSet,
     MarketStatisticsView,
     UserWishListViewSet,
+    TokenUpdateRequestViewSet,
 )
 
 router = DefaultRouter()
 router.register(r"coins", CryptoCoinViewSet, basename="coin")
 router.register(r"wishlist", UserWishListViewSet, basename="wishlist")
+router.register(r"tokenupdaterequest", TokenUpdateRequestViewSet, basename="tokenupdaterequest")
 
 urlpatterns = [
     path("market_statistics/", MarketStatisticsView.as_view(), name="market-statistics"),
