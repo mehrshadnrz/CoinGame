@@ -1,10 +1,11 @@
 # configs/views.py
 from rest_framework import generics, permissions
 
-from .models import ContactMessage, SiteConfig
+from .models import ContactMessage, SiteConfig, AboutUs
 from .serializers import (
     ContactMessageSerializer,
     SiteConfigSerializer,
+    AboutUsSerializer,
 )
 
 
@@ -19,6 +20,14 @@ class SiteConfigView(generics.RetrieveAPIView):
 
     def get_object(self):
         return SiteConfig.objects.first()
+
+
+class AboutUsView(generics.RetrieveAPIView):
+    serializer_class = AboutUsSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_object(self):
+        return AboutUs.objects.first()
 
 
 class SiteConfigUpdateView(generics.UpdateAPIView):

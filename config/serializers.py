@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import SiteConfig, ContactMessage
+from .models import SiteConfig, ContactMessage, AboutUs
 
 
 class SiteConfigSerializer(serializers.ModelSerializer):
@@ -13,3 +13,9 @@ class ContactMessageSerializer(serializers.ModelSerializer):
         model = ContactMessage
         fields = ["name", "email", "subject", "message"]
         read_only_fields = ["sent_at"]
+
+
+class AboutUsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AboutUs
+        fields = "__all__"
