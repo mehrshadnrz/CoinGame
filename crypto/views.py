@@ -105,11 +105,13 @@ class CoinImportView(APIView):
         user = request.user
         symbol = request.data.get("symbol")
         category = request.data.get("category")
+        trading_view_name = request.data.get("trading_view_name")
 
         coin, log = import_coin(
             user,
             symbol=symbol,
             category=category,
+            trading_view_name=trading_view_name,
         )
 
         if not coin:

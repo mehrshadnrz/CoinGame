@@ -118,6 +118,7 @@ def import_coin(
     user,
     symbol,
     category="Top",
+    trading_view_name=None,
 ):
     try:
         symbol = symbol.upper()
@@ -144,6 +145,7 @@ def import_coin(
                 sparkline_in_7d=data["sparkline_in_7d"],
                 circulating_supply=data["circulating_supply"],
                 category=data["category"],
+                trading_view_name=trading_view_name,
             )
 
         request_log = CoinImportRequest.objects.create(

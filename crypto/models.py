@@ -63,6 +63,8 @@ class CryptoCoin(models.Model):
         blank=True,
     )
 
+    trading_view_name = models.CharField(max_length=256, null=True, blank=True)
+
     last_updated = models.DateTimeField(auto_now=True)
 
     class Meta:
