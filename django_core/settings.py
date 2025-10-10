@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "advertisement",
     "payment",
     "promotion",
+    "marketglobal",
 ]
 
 MIDDLEWARE = [
@@ -74,10 +75,26 @@ CORS_ALLOW_ALL_ORIGINS = True
 AUTH_USER_MODEL = "user.User"
 
 REST_FRAMEWORK = {
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "60/min",
+        "user": "600/min",
+    },
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "marketglobal-cache",
+        "TIMEOUT": 0,
+    }
 }
 
 SPECTACULAR_SETTINGS = {
@@ -167,3 +184,9 @@ GECKOTERMINAL_BASE = "https://api.geckoterminal.com/api/v2"
 BSC_RPC_URL = "https://bsc-dataseed.binance.org/"  # or QuickNode / Ankr endpoint
 PAYMENT_MERCHANT_ADDRESS = "0xYourMerchantAddressHere"
 PAYMENT_MIN_CONFIRMATIONS = 3
+
+CMC_PRO_API_KEY = "96c773ee-7fee-4de3-a667-b29c4ef6633b"
+CMC_API_BASE = "https://pro-api.coinmarketcap.com"
+MARKETGLOBAL_STABLE_TICKERS = {
+    "USDT","USDC","DAI","TUSD","FDUSD","USDe","PYUSD","USDD","GUSD","LUSD","FRAX","USDP"
+}

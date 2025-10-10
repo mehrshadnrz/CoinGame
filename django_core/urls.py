@@ -13,6 +13,7 @@ urlpatterns = [
     path("api/", include("crypto.urls")),
     path("api/", include("payment.urls")),
     path("api/", include("promotion.urls")),
+    path("api/", include("marketglobal.urls")),
     # SWAGGER
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
